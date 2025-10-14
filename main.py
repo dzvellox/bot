@@ -1,0 +1,28 @@
+# main.py
+import discord
+from discord.ext import commands
+import asyncio
+
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix="/", intents=intents)
+
+@bot.event
+async def on_ready():
+    try:
+        synced = await bot.tree.sync()
+        print(f"🔁 {len(synced)} commandes slash synchronisées.")
+    except Exception as e:
+        print(f"Erreur de synchronisation : {e}")
+
+
+
+
+async def main():
+    await bot.load_extension("cogs.status")
+    await bot.load_extension("cogs.support")
+    await bot.load_extension("cogs.update")
+    await bot.load_extension("cogs.suggestion")
+    await bot.load_extension("cogs.MegaDownload")
+    await bot.start("MTMzNDkzNjE1NzMxNzg5MDE4MA.GM4n5h.79BNn5YmUkjhJWdvcwZnVUb8Tps2qz4V6g8tck")
+
+asyncio.run(main())
