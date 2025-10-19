@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord import app_commands, Embed
 
 ROLE_ID_AUTORISE = 1401313791509266521
-MEGA_LINK = "https://mega.nz/file/hYhUwa4a#dXaaLcitSzUbR80rBRV2-ees06DUxUbnZBmuN0gZpZA"
+MEGA_LINK = "https://www.dropbox.com/scl/fi/z5bbnvry9fdfqc58h7hpn/app-release.apk?rlkey=17eoaogda2343xijuukl8bcrp&st=xmjlo1pn&dl=1"
 
 class MegaDownload(commands.Cog):
     def __init__(self, bot):
@@ -26,3 +26,4 @@ class MegaDownload(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(MegaDownload(bot))
+
