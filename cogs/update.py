@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 
 SALON_DESTINATION = 1401313792154927182
-ROLE_ID_AUTORISE = 1401313791509266521  # Seul ce rôle peut utiliser la commande
+ROLE_ID_AUTORISE = 1401313791509266521 
 
 class UpdateForm(discord.ui.Modal, title="Update"): # Translated 'MonFormulaire' to 'UpdateForm' and title
     version_input = discord.ui.TextInput(label="Version", max_length=100) # Translated 'sujet' to 'version_input'
