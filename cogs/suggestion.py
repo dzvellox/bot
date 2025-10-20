@@ -4,8 +4,9 @@ from discord import app_commands
 import datetime
 
 class VoteView(discord.ui.View):
+    # Salon pour suggestions approuvées
     ROLES_AUTORISES = [1401313791509266521, 1401313791509266520, 1401313791509266519]
-    CHANNEL_VALIDATED_ID = 1402014226519953550  # Salon pour suggestions approuvées
+    CHANNEL_VALIDATED_ID = 1402014226519953550  # Channel for approved suggestions
 
     def __init__(self, author: discord.User):
         super().__init__(timeout=None)
@@ -35,14 +36,14 @@ class VoteView(discord.ui.View):
     def has_permission(self, user: discord.Member):
         return any(role.id in self.ROLES_AUTORISES for role in user.roles)
 
-    @discord.ui.button(label="👍 For", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="👍 Vote Up", style=discord.ButtonStyle.blurple)
     async def pour(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.votes["down"].discard(interaction.user.id)
         self.votes["up"].add(interaction.user.id)
         await interaction.response.defer()
         await self.update_message()
 
-    @discord.ui.button(label="👎 Against", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="👎 Vote Down", style=discord.ButtonStyle.blurple)
     async def contre(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.votes["up"].discard(interaction.user.id)
         self.votes["down"].add(interaction.user.id)
@@ -56,7 +57,7 @@ class VoteView(discord.ui.View):
             return
 
         embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Status", value="✅ Approve", inline=False)
+        embed.set_field_at(1, name="🕐 Status", value="✅ Approved", inline=False)
         await interaction.response.edit_message(embed=embed, view=None)
 
         # Créer et envoyer dans le salon des approuvées
@@ -69,10 +70,10 @@ class VoteView(discord.ui.View):
             description=embed.description,
             color=discord.Color.green()
         )
-        validated_embed.set_author(name=f"Proposed by : {self.author}")
+        validated_embed.set_author(name=f"Proposed by: {self.author}")
         validated_embed.add_field(name="📊 Result", value=f"👍 {up_pct:.1f}% • 👎 {down_pct:.1f}%", inline=False)
         validated_embed.add_field(name="👤 Approved by", value=interaction.user.mention, inline=False)
-        validated_embed.set_footer(text=f"{datetime.datetime.now():%d/%m/%Y à %H:%M}")
+        validated_embed.set_footer(text=f"{datetime.datetime.now():%m/%d/%Y at %H:%M}") # Format de date US courant
 
         if embed.image:
             validated_embed.set_image(url=embed.image.url)
@@ -81,13 +82,13 @@ class VoteView(discord.ui.View):
         if channel:
             await channel.send(embed=validated_embed)
 
-    @discord.ui.button(label="❌ Dismiss", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="❌ Reject", style=discord.ButtonStyle.danger)
     async def rejeter(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.has_permission(interaction.user):
-            await interaction.response.send_message("❌ You don't have permission to reject.", ephemeral=True)
+            await interaction.response.send_message("❌ You do not have permission to reject.", ephemeral=True)
             return
         embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Status", value="❌ Dismiss", inline=False)
+        embed.set_field_at(1, name="🕐 Status", value="❌ Rejected", inline=False)
         await interaction.response.edit_message(embed=embed, view=None)
 
 class Suggestions(commands.Cog):
@@ -97,24 +98,24 @@ class Suggestions(commands.Cog):
     @app_commands.command(name="suggest", description="Submit a suggestion.")
     async def suggest(self, interaction: discord.Interaction, texte: str, image: str = None):
         embed = discord.Embed(title="💡 Suggestion", description=texte, color=discord.Color.orange())
-        embed.add_field(name="🕐 Status", value="⏳ On hold", inline=False)
+        embed.add_field(name="🕐 Status", value="⏳ Pending", inline=False)
         embed.add_field(name="📊 Votes", value="👍 0 (0.0%) • 👎 0 (0.0%)\n`🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥`", inline=False)
-        embed.set_footer(text=f"By {interaction.user} • {datetime.datetime.now():%d/%m/%Y à %H:%M}")
+        embed.set_footer(text=f"By {interaction.user} • {datetime.datetime.now():%m/%d/%Y at %H:%M}") # Format de date US courant
         if image:
             embed.set_image(url=image)
 
         view = VoteView(author=interaction.user)
 
-        # 🔁 Envoyer dans le canal fixe
+        # 🔁 Send to the fixed channel
         channel = interaction.client.get_channel(1401313792154927184)
         if channel is None:
-            await interaction.response.send_message("❌ Unable to find the suggestion room.", ephemeral=True)
+            await interaction.response.send_message("❌ Could not find the suggestions channel.", ephemeral=True)
             return
 
         msg = await channel.send(embed=embed, view=view)
         view.message = msg
 
-        await interaction.response.send_message("✅ Your suggestion has been successfully sent to the dedicated channel !", ephemeral=True)
+        await interaction.response.send_message("✅ Your suggestion has been successfully sent to the dedicated channel!", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Suggestions(bot))
