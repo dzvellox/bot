@@ -1,118 +1,59 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import datetime
 
-class VoteView(discord.ui.View):
-    # Authorized roles (IDs remain in French/original as they are internal)
-    ROLES_AUTORISES = [1401313791509266521, 1401313791509266520, 1401313791509266519]
-    CHANNEL_VALIDATED_ID = 1402014226519953550  # Channel for approved suggestions
+SALON_DESTINATION = 1401313792154927182
+ROLE_ID_AUTORISE = 1401313791509266521  # Seul ce rôle peut utiliser la commande
 
-    def __init__(self, author: discord.User):
-        super().__init__(timeout=None)
-        self.votes = {"up": set(), "down": set()}
-        self.author = author
-        self.message = None
+class UpdateForm(discord.ui.Modal, title="Update"): # Translated 'MonFormulaire' to 'UpdateForm' and title
+    version_input = discord.ui.TextInput(label="Version", max_length=100) # Translated 'sujet' to 'version_input'
+    whats_new_input = discord.ui.TextInput(label="What's new", style=discord.TextStyle.paragraph, max_length=500) # Translated 'new' to 'whats_new_input'
+    bugs_fixed_input = discord.ui.TextInput(label="Bugs fixed", style=discord.TextStyle.paragraph, max_length=500) # Translated 'bug' to 'bugs_fixed_input'
 
-    async def update_message(self):
-        total = len(self.votes["up"]) + len(self.votes["down"])
-        up_pct = (len(self.votes["up"]) / total * 100) if total else 0
-        down_pct = (len(self.votes["down"]) / total * 100) if total else 0
+    def __init__(self, message=None, view=None):
+        super().__init__()
+        self.message = message
+        self.view = view
 
-        bar_length = 20
-        up_len = int((len(self.votes["up"]) / total) * bar_length) if total else 0
-        down_len = bar_length - up_len
-        progress_bar = f"{'🟩' * up_len}{'🟥' * down_len}"
-
-        embed = self.message.embeds[0]
-        embed.set_field_at(
-            2,
-            name="📊 Votes",
-            value=f"👍 {len(self.votes['up'])} ({up_pct:.1f}%) • 👎 {len(self.votes['down'])} ({down_pct:.1f}%)\n`{progress_bar}`",
-            inline=False,
-        )
-        await self.message.edit(embed=embed, view=self)
-
-    def has_permission(self, user: discord.Member):
-        return any(role.id in self.ROLES_AUTORISES for role in user.roles)
-
-    @discord.ui.button(label="👍 Vote Up", style=discord.ButtonStyle.blurple)
-    async def pour(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.votes["down"].discard(interaction.user.id)
-        self.votes["up"].add(interaction.user.id)
-        await interaction.response.defer()
-        await self.update_message()
-
-    @discord.ui.button(label="👎 Vote Down", style=discord.ButtonStyle.blurple)
-    async def contre(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.votes["up"].discard(interaction.user.id)
-        self.votes["down"].add(interaction.user.id)
-        await interaction.response.defer()
-        await self.update_message()
-
-    @discord.ui.button(label="✅ Approve", style=discord.ButtonStyle.success)
-    async def approuver(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.has_permission(interaction.user):
-            await interaction.response.send_message("❌ You do not have permission to approve.", ephemeral=True)
+    async def on_submit(self, interaction: discord.Interaction):
+        channel = interaction.guild.get_channel(SALON_DESTINATION)
+        if channel is None:
+            await interaction.response.send_message("❌ Error: Update channel not found.", ephemeral=True) # Translated 'Room not found.'
             return
 
-        embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Status", value="✅ Approved", inline=False)
-        await interaction.response.edit_message(embed=embed, view=None)
-
-        # Create and send to the approved channel
-        total = len(self.votes["up"]) + len(self.votes["down"])
-        up_pct = (len(self.votes["up"]) / total * 100) if total else 0
-        down_pct = (len(self.votes["down"]) / total * 100) if total else 0
-
-        validated_embed = discord.Embed(
-            title="✅ Suggestion Approved",
-            description=embed.description,
-            color=discord.Color.green()
+        embed = discord.Embed(
+            title=f"📦 Update {self.version_input.value}", # Using new variable name
+            color=discord.Color.orange()
         )
-        validated_embed.set_author(name=f"Proposed by: {self.author}")
-        validated_embed.add_field(name="📊 Result", value=f"👍 {up_pct:.1f}% • 👎 {down_pct:.1f}%", inline=False)
-        validated_embed.add_field(name="👤 Approved by", value=interaction.user.mention, inline=False)
-        validated_embed.set_footer(text=f"{datetime.datetime.now():%m/%d/%Y at %H:%M}")
+        embed.add_field(name="🆕 What's new", value=self.whats_new_input.value, inline=False) # Using new variable name
+        embed.add_field(name="🛠️ Bugs fixed", value=self.bugs_fixed_input.value, inline=False) # Using new variable name
+        embed.set_footer(text=f"Posted by {interaction.user}", icon_url=interaction.user.display_avatar.url)
 
-        channel = interaction.client.get_channel(self.CHANNEL_VALIDATED_ID)
-        if channel:
-            await channel.send(embed=validated_embed)
+        # Si le message et la vue existent (mode bouton), on enlève la vue du message
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except Exception:
+                pass
 
-    @discord.ui.button(label="❌ Reject", style=discord.ButtonStyle.danger)
-    async def rejeter(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.has_permission(interaction.user):
-            await interaction.response.send_message("❌ You do not have permission to reject.", ephemeral=True)
-            return
-        embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Status", value="❌ Rejected", inline=False)
-        await interaction.response.edit_message(embed=embed, view=None)
+        await channel.send(embed=embed)
+        await interaction.response.send_message("✅ Update sent successfully!", ephemeral=True) # Translated
 
-class Suggestions(commands.Cog):
+
+class Update(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="suggest", description="Submit a suggestion.")
-    async def suggest(self, interaction: discord.Interaction, texte: str, image: str = None):
-        embed = discord.Embed(title="💡 Suggestion", description=texte, color=discord.Color.orange())
-        embed.add_field(name="🕐 Status", value="⏳ Pending", inline=False)
-        embed.add_field(name="📊 Votes", value="👍 0 (0.0%) • 👎 0 (0.0%)\n`🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥`", inline=False)
-        embed.set_footer(text=f"By {interaction.user} • {datetime.datetime.now():%m/%d/%Y at %H:%M}")
-        if image:
-            embed.set_image(url=image)
-
-        view = VoteView(author=interaction.user)
-
-        # Send to the fixed channel
-        channel = interaction.client.get_channel(1401313792154927184)
-        if channel is None:
-            await interaction.response.send_message("❌ Could not find the suggestions channel.", ephemeral=True)
+    @app_commands.command(name="update", description="Create a new bot update announcement.") # Translated description
+    async def update_slash(self, interaction: discord.Interaction):
+        if not any(role.id == ROLE_ID_AUTORISE for role in interaction.user.roles):
+            await interaction.response.send_message("❌ You do not have permission to use this command.", ephemeral=True) # Translated permission error
             return
 
-        msg = await channel.send(embed=embed, view=view)
-        view.message = msg
+        # Ouvre directement le modal
+        modal = UpdateForm() # Using new class name
+        await interaction.response.send_modal(modal)
 
-        await interaction.response.send_message("✅ Your suggestion has been successfully sent to the dedicated channel!", ephemeral=True)
 
 async def setup(bot):
-    await bot.add_cog(Suggestions(bot))
+    await bot.add_cog(Update(bot))
