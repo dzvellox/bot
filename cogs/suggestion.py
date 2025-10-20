@@ -99,7 +99,7 @@ class Suggestions(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="suggerer", description="Soumettre une nouvelle suggestion.") # Traduit
+    @app_commands.command(name="suggest", description="Soumettre une nouvelle suggestion.") # Traduit
     async def suggest(self, interaction: discord.Interaction, texte: str, image: str = None):
         embed = discord.Embed(title="💡 Suggestion", description=texte, color=discord.Color.orange())
         embed.add_field(name="🕐 Statut", value="⏳ En attente", inline=False) # Traduit
