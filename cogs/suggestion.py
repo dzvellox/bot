@@ -35,28 +35,28 @@ class VoteView(discord.ui.View):
     def has_permission(self, user: discord.Member):
         return any(role.id in self.ROLES_AUTORISES for role in user.roles)
 
-    @discord.ui.button(label="👍 Pour", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="👍 For", style=discord.ButtonStyle.blurple)
     async def pour(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.votes["down"].discard(interaction.user.id)
         self.votes["up"].add(interaction.user.id)
         await interaction.response.defer()
         await self.update_message()
 
-    @discord.ui.button(label="👎 Contre", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="👎 Against", style=discord.ButtonStyle.blurple)
     async def contre(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.votes["up"].discard(interaction.user.id)
         self.votes["down"].add(interaction.user.id)
         await interaction.response.defer()
         await self.update_message()
 
-    @discord.ui.button(label="✅ Approuver", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="✅ Approve", style=discord.ButtonStyle.success)
     async def approuver(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.has_permission(interaction.user):
-            await interaction.response.send_message("❌ Tu n’as pas la permission d’approuver.", ephemeral=True)
+            await interaction.response.send_message("❌ You do not have permission to approve.", ephemeral=True)
             return
 
         embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Statut", value="✅ Approuvée", inline=False)
+        embed.set_field_at(1, name="🕐 Status", value="✅ Approve", inline=False)
         await interaction.response.edit_message(embed=embed, view=None)
 
         # Créer et envoyer dans le salon des approuvées
@@ -65,13 +65,13 @@ class VoteView(discord.ui.View):
         down_pct = (len(self.votes["down"]) / total * 100) if total else 0
 
         validated_embed = discord.Embed(
-            title="✅ Suggestion Approuvée",
+            title="✅ Suggestion Approved",
             description=embed.description,
             color=discord.Color.green()
         )
-        validated_embed.set_author(name=f"Proposée par : {self.author}")
-        validated_embed.add_field(name="📊 Résultat", value=f"👍 {up_pct:.1f}% • 👎 {down_pct:.1f}%", inline=False)
-        validated_embed.add_field(name="👤 Approuvée par", value=interaction.user.mention, inline=False)
+        validated_embed.set_author(name=f"Proposed by : {self.author}")
+        validated_embed.add_field(name="📊 Result", value=f"👍 {up_pct:.1f}% • 👎 {down_pct:.1f}%", inline=False)
+        validated_embed.add_field(name="👤 Approved by", value=interaction.user.mention, inline=False)
         validated_embed.set_footer(text=f"{datetime.datetime.now():%d/%m/%Y à %H:%M}")
 
         if embed.image:
@@ -81,25 +81,25 @@ class VoteView(discord.ui.View):
         if channel:
             await channel.send(embed=validated_embed)
 
-    @discord.ui.button(label="❌ Rejeter", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="❌ Dismiss", style=discord.ButtonStyle.danger)
     async def rejeter(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.has_permission(interaction.user):
-            await interaction.response.send_message("❌ Tu n’as pas la permission de rejeter.", ephemeral=True)
+            await interaction.response.send_message("❌ You don't have permission to reject.", ephemeral=True)
             return
         embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Statut", value="❌ Rejetée", inline=False)
+        embed.set_field_at(1, name="🕐 Status", value="❌ Dismiss", inline=False)
         await interaction.response.edit_message(embed=embed, view=None)
 
 class Suggestions(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="suggest", description="Soumettre une suggestion.")
+    @app_commands.command(name="suggest", description="Submit a suggestion.")
     async def suggest(self, interaction: discord.Interaction, texte: str, image: str = None):
         embed = discord.Embed(title="💡 Suggestion", description=texte, color=discord.Color.orange())
-        embed.add_field(name="🕐 Statut", value="⏳ En attente", inline=False)
+        embed.add_field(name="🕐 Status", value="⏳ On hold", inline=False)
         embed.add_field(name="📊 Votes", value="👍 0 (0.0%) • 👎 0 (0.0%)\n`🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥`", inline=False)
-        embed.set_footer(text=f"Par {interaction.user} • {datetime.datetime.now():%d/%m/%Y à %H:%M}")
+        embed.set_footer(text=f"By {interaction.user} • {datetime.datetime.now():%d/%m/%Y à %H:%M}")
         if image:
             embed.set_image(url=image)
 
@@ -108,13 +108,13 @@ class Suggestions(commands.Cog):
         # 🔁 Envoyer dans le canal fixe
         channel = interaction.client.get_channel(1401313792154927184)
         if channel is None:
-            await interaction.response.send_message("❌ Impossible de trouver le salon de suggestions.", ephemeral=True)
+            await interaction.response.send_message("❌ Unable to find the suggestion room.", ephemeral=True)
             return
 
         msg = await channel.send(embed=embed, view=view)
         view.message = msg
 
-        await interaction.response.send_message("✅ Ta suggestion a été envoyée avec succès dans le canal dédié !", ephemeral=True)
+        await interaction.response.send_message("✅ Your suggestion has been successfully sent to the dedicated channel !", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Suggestions(bot))

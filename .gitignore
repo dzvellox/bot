@@ -1,0 +1,11 @@
+# Variables d'environnement
+.env
+
+# Fichiers compilés Python
+__pycache__/
+*.pyc
+
+# Dossiers temporaires
+*.egg-info/
+dist/
+build/
