@@ -1,72 +1,82 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import asyncio
 import os
-from aiohttp import web # Importation spécifique pour le serveur web
+from aiohttp import web, ClientSession
 
-# Configuration de base
+# ----------------------------------------------------------------------
+# 1. CONFIG BOT DISCORD
+# ----------------------------------------------------------------------
 intents = discord.Intents.all()
-# Note: L'intents.all() n'est pas recommandé pour les grands bots en production
-# Utilisez uniquement les intents nécessaires pour optimiser les performances.
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # ----------------------------------------------------------------------
-# 1. SERVER DE 'KEEP-ALIVE' (SOLUTION AU TIMEOUT)
+# 2. CONFIG PING-PONG
 # ----------------------------------------------------------------------
+SERVER_B_URL = "http://127.0.0.1:5001/ping"  # URL du serveur B (à modifier)
 
+# Session HTTP globale
+session = ClientSession()
+
+# ----------------------------------------------------------------------
+# 3. SERVEUR KEEP-ALIVE + PING-PONG
+# ----------------------------------------------------------------------
 async def keep_alive_server():
-    """Démarre un petit serveur web sur le port requis par la plateforme
-    (ex: Render) pour éviter le 'Port scan timeout'.
-    """
-    # 1. Définir le gestionnaire de requête
+    """Serveur web pour Keep-Alive et recevoir les pings de B"""
     async def handle_health_check(request):
-        # Réponse simple pour le "Health Check"
         return web.Response(text="Bot is running and port is bound.")
 
-    # 2. Récupérer la variable d'environnement PORT, ou utiliser 8080 par défaut
+    async def handle_ping(request):
+        data = await request.json()
+        print(f"[A] Reçu de B : {data}")
+        return web.json_response({"message": "pong from A"})
+
     PORT = int(os.environ.get("PORT", 8080))
-    
-    # 3. Configuration et démarrage du serveur aiohttp
     app = web.Application()
-    app.router.add_get('/', handle_health_check) # Attachement à l'URL racine
-    
+    app.router.add_get("/", handle_health_check)
+    app.router.add_post("/ping", handle_ping)
+
     runner = web.AppRunner(app)
     await runner.setup()
-    
-    # Lier à '0.0.0.0' pour être accessible par l'environnement
-    site = web.TCPSite(runner, '0.0.0.0', PORT) 
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    
-    print(f"🌐 Serveur Keep-Alive démarré sur 0.0.0.0:{PORT}")
+    print(f"🌐 Serveur Keep-Alive + Ping-Pong démarré sur 0.0.0.0:{PORT}")
 
 # ----------------------------------------------------------------------
-# 2. ÉVÉNEMENTS DU BOT DISCORD
+# 4. TÂCHE ASYNCHRONE PING PONG VERS B
 # ----------------------------------------------------------------------
+async def ping_b_loop():
+    await bot.wait_until_ready()  # attend que le bot soit prêt
+    while True:
+        try:
+            payload = {"from": "A"}
+            print("[A] Envoi à B :", payload)
+            async with session.post(SERVER_B_URL, json=payload, timeout=10) as resp:
+                resp_json = await resp.json()
+                print("[A] Réponse de B :", resp_json)
+        except Exception as e:
+            print("[A] Erreur :", e)
+        await asyncio.sleep(20)  # attente 20 secondes
 
+# ----------------------------------------------------------------------
+# 5. ÉVÉNEMENTS DU BOT
+# ----------------------------------------------------------------------
 @bot.event
 async def on_ready():
-    """Est appelé lorsque le bot est connecté à Discord."""
     print("---------------------------------------")
     print(f"🤖 Bot connecté en tant que {bot.user}")
-    
     try:
-        # Synchronisation des commandes slash
         synced = await bot.tree.sync()
         print(f"🔁 {len(synced)} commandes slash synchronisées.")
     except Exception as e:
         print(f"❌ Erreur de synchronisation : {e}")
-        
     print("---------------------------------------")
 
 # ----------------------------------------------------------------------
-# 3. CHARGEMENT DES COGS ET DÉMARRAGE
+# 6. DÉMARRAGE PRINCIPAL
 # ----------------------------------------------------------------------
-
 async def main():
-    """Fonction principale pour charger les extensions et démarrer le bot."""
-    
-    # 3.1. Chargement des extensions (Cogs)
-    print("Chargement des cogs...")
+    # Charger les cogs
     try:
         await bot.load_extension("cogs.status")
         await bot.load_extension("cogs.support")
@@ -75,21 +85,20 @@ async def main():
         await bot.load_extension("cogs.MegaDownload")
         print("✅ Cogs chargés avec succès.")
     except Exception as e:
-        print(f"❌ ERREUR lors du chargement des cogs : {e}")
-        
-    # 3.2. Lancement du serveur Keep-Alive en tâche de fond
-    # Il doit être lancé AVANT le bot.start()
+        print(f"❌ Erreur lors du chargement des cogs : {e}")
+
+    # Lancer le serveur Keep-Alive + Ping-Pong
     asyncio.create_task(keep_alive_server())
 
-    # 3.3. Récupération du Token et lancement du Bot
+    # Lancer la boucle ping vers B
+    asyncio.create_task(ping_b_loop())
+
+    # Lancer le bot
     TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
         print("❌ ERREUR : La variable DISCORD_TOKEN est manquante.")
         return
-
-    # Cette ligne est bloquante et maintiendra le bot en ligne
     await bot.start(TOKEN)
 
 if __name__ == "__main__":
-    # Point d'entrée de l'application
     asyncio.run(main())
