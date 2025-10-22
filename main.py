@@ -13,7 +13,7 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 # ----------------------------------------------------------------------
 # 2. CONFIG PING-PONG
 # ----------------------------------------------------------------------
-SERVER_B_URL = "srv-d3rugsi4d50c73fmnt8g/ping"  # URL du serveur B (à modifier)
+SERVER_B_URL = "https://pong-jfd2.onrender.com/ping"  # URL du serveur B (à modifier)
 
 # Session HTTP globale
 session = ClientSession()
@@ -102,4 +102,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
