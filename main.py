@@ -73,34 +73,73 @@ async def on_ready():
     print("---------------------------------------")
 
 # ----------------------------------------------------------------------
-# 6. DÉMARRAGE PRINCIPAL
+# 6. NOUVELLE STRUCTURE DE DÉMARRAGE
 # ----------------------------------------------------------------------
-async def main():
-    # Charger les cogs
-    try:
-        await bot.load_extension("cogs.status")
-        await bot.load_extension("cogs.support")
-        await bot.load_extension("cogs.update")
-        await bot.load_extension("cogs.suggestion")
-        await bot.load_extension("cogs.MegaDownload")
-        print("✅ Cogs chargés avec succès.")
-    except Exception as e:
-        print(f"❌ Erreur lors du chargement des cogs : {e}")
 
+# (Laisser tout le code précédent tel quel, y compris 1, 2, 3, 4, 5)
+
+async def setup_cogs(bot: commands.Bot):
+    """Charge les cogs de manière asynchrone."""
+    cogs = ["cogs.status", "cogs.support", "cogs.update", "cogs.suggestion", "cogs.MegaDownload"]
+    for cog in cogs:
+        try:
+            await bot.load_extension(cog)
+            print(f"✅ Cog {cog} chargé.")
+        except Exception as e:
+            print(f"❌ Erreur de chargement du cog {cog}: {e}")
+
+async def start_background_tasks(bot: commands.Bot):
+    """Démarre le serveur Keep-Alive et la boucle Ping-Pong."""
     # Lancer le serveur Keep-Alive + Ping-Pong
-    asyncio.create_task(keep_alive_server())
+    # Note : Le serveur web doit être démarré en tant que tâche de fond.
+    bot.loop.create_task(keep_alive_server())
+    print("🚀 Tâche Keep-Alive démarrée.")
 
     # Lancer la boucle ping vers B
-    asyncio.create_task(ping_b_loop())
+    # Si vous utilisez la version @tasks.loop, utilisez :
+    # ping_b_loop.start() 
+    # Si vous gardez la version async def :
+    bot.loop.create_task(ping_b_loop())
+    print("🚀 Tâche Ping-Pong démarrée.")
 
-    # Lancer le bot
+
+@bot.event
+async def on_ready():
+    print("---------------------------------------")
+    print(f"🤖 Bot connecté en tant que {bot.user}")
+    try:
+        synced = await bot.tree.sync()
+        print(f"🔁 {len(synced)} commandes slash synchronisées.")
+    except Exception as e:
+        print(f"❌ Erreur de synchronisation : {e}")
+    print("---------------------------------------")
+
+
+@bot.event
+async def on_disconnect():
+    """Ferme la session aiohttp proprement."""
+    print("🔌 Déconnexion du bot. Fermeture de la session aiohttp.")
+    if not session.closed:
+        await session.close()
+        
+
+# ----------------------------------------------------------------------
+# DÉMARRAGE PRINCIPAL (Le seul bloc "if __name__")
+# ----------------------------------------------------------------------
+
+# On s'assure que les tâches de fond sont démarrées dans la boucle d'événements du bot.
+# La méthode 'setup_hook' est appelée juste avant que le bot ne se connecte à Discord.
+bot.setup_hook = lambda: asyncio.gather(
+    setup_cogs(bot),
+    start_background_tasks(bot)
+)
+
+if __name__ == "__main__":
     TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
         print("❌ ERREUR : La variable DISCORD_TOKEN est manquante.")
-        return
-    await bot.start(TOKEN)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    else:
+        # bot.run() démarre tout : la boucle, les cogs (via setup_hook), et la connexion Discord.
+        bot.run(TOKEN)
 
 
