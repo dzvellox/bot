@@ -24,6 +24,7 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 # ----------------------------------------------------------------------
 # 2. CONFIG PING-PONG
 # ----------------------------------------------------------------------
+ENABLE_PING_PONG = False  # Mettez True si vous avez un serveur B
 SERVER_B_URL = "https://pong-jfd2.onrender.com/ping"
 session = None  # Sera initialisé dans main()
 
