@@ -8,12 +8,14 @@ from aiohttp import web, ClientSession
 # 1. CONFIG BOT DISCORD
 # ----------------------------------------------------------------------
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="/", intents=intents)
+# Changement : Ajout de `status=discord.Status.invisible` pour que le bot
+# apparaisse comme hors ligne pour les utilisateurs, tout en étant actif.
+bot = commands.Bot(command_prefix="/", intents=intents, status=discord.Status.invisible)
 
 # ----------------------------------------------------------------------
 # 2. CONFIG PING-PONG
 # ----------------------------------------------------------------------
-SERVER_B_URL = "https://pong-jfd2.onrender.com/ping"  # URL du serveur B
+SERVER_B_URL = "https://pong-jfd2.onrender.com/ping" # URL du serveur B
 session: ClientSession = None  # Session aiohttp globale
 
 # ----------------------------------------------------------------------
@@ -49,7 +51,7 @@ async def keep_alive_server():
 # ----------------------------------------------------------------------
 async def ping_b_loop():
     global session
-    await bot.wait_until_ready()  # attend que le bot soit prêt
+    await bot.wait_until_ready() # attend que le bot soit prêt
     while True:
         try:
             payload = {"from": "A"}
@@ -67,7 +69,12 @@ async def ping_b_loop():
 @bot.event
 async def on_ready():
     print("---------------------------------------")
-    print(f"🤖 Bot connecté en tant que {bot.user}")
+    print(f"🤖 Bot connecté en tant que {bot.user} (Apparence : Hors ligne/Invisible)")
+    
+    # AJOUT IMPORTANT : Définir explicitement le statut sur invisible après la connexion
+    # Ceci garantit que même si le statut passe à 'online' brièvement, il est corrigé immédiatement.
+    await bot.change_presence(status=discord.Status.invisible)
+
     try:
         synced = await bot.tree.sync()
         print(f"🔁 {len(synced)} commandes slash synchronisées.")
@@ -102,7 +109,7 @@ async def setup_cogs(bot: commands.Bot):
 async def start_background_tasks(bot: commands.Bot):
     """Démarre le serveur Keep-Alive et la boucle Ping-Pong."""
     global session
-    session = ClientSession()  # création de la session ici
+    session = ClientSession() # création de la session ici
     # Démarrer le serveur Keep-Alive
     bot.loop.create_task(keep_alive_server())
     print("🚀 Tâche Keep-Alive démarrée.")
