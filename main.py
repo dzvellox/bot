@@ -22,72 +22,51 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # ----------------------------------------------------------------------
-# 2. CONFIG PING-PONG
+# 2. CONFIG - Pas besoin de ping-pong avec UptimeRobot
 # ----------------------------------------------------------------------
-ENABLE_PING_PONG = False  # Mettez True si vous avez un serveur B
-SERVER_B_URL = "https://pong-jfd2.onrender.com/ping"
+# Le serveur répond juste aux pings d'UptimeRobot
 session = None  # Sera initialisé dans main()
 
 # Variables de monitoring
 last_activity = datetime.now()
-ping_count = 0
-error_count = 0
+start_time = datetime.now()
 
 # ----------------------------------------------------------------------
 # 3. SERVEUR KEEP-ALIVE + PING-PONG
 # ----------------------------------------------------------------------
 async def keep_alive_server():
-    """Serveur web pour Keep-Alive et recevoir les pings de B"""
+    """Serveur web pour répondre aux pings d'UptimeRobot"""
     async def handle_health_check(request):
         global last_activity
         last_activity = datetime.now()
         
         status_info = {
+            "status": "online",
             "bot_ready": bot.is_ready(),
             "bot_closed": bot.is_closed(),
             "guilds": len(bot.guilds) if bot.is_ready() else 0,
             "latency": f"{round(bot.latency * 1000, 2)}ms" if bot.is_ready() else "N/A",
             "last_activity": last_activity.isoformat(),
-            "ping_count": ping_count,
-            "error_count": error_count,
-            "ping_task_running": ping_b_task.is_running() if hasattr(ping_b_task, 'is_running') else False
+            "uptime": str(datetime.now() - start_time).split('.')[0] if 'start_time' in globals() else "N/A"
         }
         
-        logger.debug(f"[HEALTH CHECK] {status_info}")
+        logger.debug(f"[HEALTH CHECK] UptimeRobot ping reçu")
         
         if bot.is_ready():
             return web.json_response(status_info)
         else:
             return web.json_response(status_info, status=503)
     
-    async def handle_ping(request):
-        global last_activity
-        last_activity = datetime.now()
-        
-        try:
-            data = await request.json()
-            logger.info(f"[A] 📨 Reçu de B : {data}")
-            return web.json_response({
-                "message": "pong from A",
-                "status": "active",
-                "bot_ready": bot.is_ready(),
-                "timestamp": datetime.now().isoformat()
-            })
-        except Exception as e:
-            logger.error(f"[A] ❌ Erreur handle_ping : {e}")
-            logger.debug(traceback.format_exc())
-            return web.json_response({"error": str(e)}, status=500)
-    
     PORT = int(os.environ.get("PORT", 8080))
     app = web.Application()
     app.router.add_get("/", handle_health_check)
-    app.router.add_post("/ping", handle_ping)
     
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
     logger.info(f"🌐 Serveur Keep-Alive démarré sur 0.0.0.0:{PORT}")
+    logger.info(f"📍 Configurez UptimeRobot pour pinguer cette URL toutes les 5 minutes")
 
 # ----------------------------------------------------------------------
 # 4. TÂCHE ASYNCHRONE PING PONG VERS B (avec tasks.loop)
@@ -354,10 +333,26 @@ async def main():
         await cleanup()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("👋 Arrêt du bot")
-    except Exception as e:
-        logger.error(f"❌ Erreur au démarrage : {e}")
-        logger.debug(traceback.format_exc())
+    max_retries = 5
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            logger.info(f"🚀 Tentative de démarrage #{retry_count + 1}")
+            asyncio.run(main())
+            break  # Si on arrive ici, tout s'est bien passé
+        except KeyboardInterrupt:
+            logger.info("👋 Arrêt du bot")
+            break
+        except Exception as e:
+            retry_count += 1
+            logger.error(f"❌ Erreur au démarrage : {e}")
+            
+            if retry_count < max_retries:
+                wait_time = retry_count * 10  # 10s, 20s, 30s...
+                logger.info(f"⏳ Nouvelle tentative dans {wait_time}s...")
+                import time
+                time.sleep(wait_time)
+            else:
+                logger.error("❌ Nombre maximum de tentatives atteint")
+                logger.debug(traceback.format_exc())
