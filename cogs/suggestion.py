@@ -26,24 +26,24 @@ class VoteView(discord.ui.View):
         self.author = author
         self.message = None
 
-    def create_progress_bar(self, up_votes: int, down_votes: int, length: int = 15) -> str:
-        """Crée une barre de progression élégante avec emojis personnalisés"""
+    def create_progress_bar(self, up_votes: int, down_votes: int, length: int = 20) -> str:
+        """Crée une barre de progression visuelle avec emojis colorés"""
         total = up_votes + down_votes
         if total == 0:
-            return "▱" * length
+            return "⬜" * length
         
         up_ratio = up_votes / total
         filled = int(up_ratio * length)
         
-        # Barre dégradée avec style
+        # Barre avec vrais emojis colorés pour un meilleur rendu
         bar = ""
         for i in range(length):
             if i < filled:
-                bar += "█"
+                bar += "🟩"  # Carré vert
             else:
-                bar += "░"
+                bar += "🟥"  # Carré rouge
         
-        return f"🟢 {bar} 🔴"
+        return bar
 
     async def update_message(self):
         up_count = len(self.votes["up"])
@@ -65,8 +65,7 @@ class VoteView(discord.ui.View):
             f"│  CONTRE   │  {down_count:^3}  │ {down_pct:>5.1f}% │\n"
             f"└─────────────────────────┘\n"
             f"```\n"
-            f"{progress_bar}\n"
-            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{progress_bar}\n\n"
             f"**{total}** vote{'s' if total != 1 else ''} au total"
         )
         
@@ -235,8 +234,7 @@ class Suggestions(commands.Cog):
                 f"│  CONTRE   │   0  │  0.0% │\n"
                 f"└─────────────────────────┘\n"
                 f"```\n"
-                f"🟢 ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 🔴\n"
-                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜\n\n"
                 f"**0** vote au total"
             ),
             inline=False
