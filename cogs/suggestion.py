@@ -5,8 +5,16 @@ import datetime
 
 # Constantes des ID
 ROLE_IDS_AUTORISES = [1401313791509266521, 1401313791509266520, 1401313791509266519]
-CHANNEL_VALIDATED_ID = 1402014226519953550  # Salon pour suggestions approuvées
-CHANNEL_SUGGESTIONS_ID = 1401313792154927184 # Salon où les suggestions sont postées
+CHANNEL_VALIDATED_ID = 1402014226519953550
+CHANNEL_SUGGESTIONS_ID = 1401313792154927184
+
+# Palette de couleurs moderne
+COLORS = {
+    "pending": 0x5865F2,      # Bleu Discord
+    "approved": 0x57F287,     # Vert vibrant
+    "rejected": 0xED4245,     # Rouge vibrant
+    "neutral": 0x99AAB5       # Gris neutre
+}
 
 class VoteView(discord.ui.View):
     ROLES_AUTORISES = ROLE_IDS_AUTORISES
@@ -18,21 +26,54 @@ class VoteView(discord.ui.View):
         self.author = author
         self.message = None
 
-    async def update_message(self):
-        total = len(self.votes["up"]) + len(self.votes["down"])
-        up_pct = (len(self.votes["up"]) / total * 100) if total else 0
-        down_pct = (len(self.votes["down"]) / total * 100) if total else 0
+    def create_progress_bar(self, up_votes: int, down_votes: int, length: int = 15) -> str:
+        """Crée une barre de progression élégante avec emojis personnalisés"""
+        total = up_votes + down_votes
+        if total == 0:
+            return "▱" * length
+        
+        up_ratio = up_votes / total
+        filled = int(up_ratio * length)
+        
+        # Barre dégradée avec style
+        bar = ""
+        for i in range(length):
+            if i < filled:
+                bar += "█"
+            else:
+                bar += "░"
+        
+        return f"🟢 {bar} 🔴"
 
-        bar_length = 20
-        up_len = int((len(self.votes["up"]) / total) * bar_length) if total else 0
-        down_len = bar_length - up_len
-        progress_bar = f"{'🟩' * up_len}{'🟥' * down_len}"
+    async def update_message(self):
+        up_count = len(self.votes["up"])
+        down_count = len(self.votes["down"])
+        total = up_count + down_count
+        
+        up_pct = (up_count / total * 100) if total else 0
+        down_pct = (down_count / total * 100) if total else 0
+
+        progress_bar = self.create_progress_bar(up_count, down_count)
 
         embed = self.message.embeds[0]
+        
+        # Mise à jour du champ votes avec design amélioré
+        vote_display = (
+            f"```\n"
+            f"┌─────────────────────────┐\n"
+            f"│  POUR     │  {up_count:^3}  │ {up_pct:>5.1f}% │\n"
+            f"│  CONTRE   │  {down_count:^3}  │ {down_pct:>5.1f}% │\n"
+            f"└─────────────────────────┘\n"
+            f"```\n"
+            f"{progress_bar}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"**{total}** vote{'s' if total != 1 else ''} au total"
+        )
+        
         embed.set_field_at(
-            2,
-            name="📊 Votes",
-            value=f"👍 {len(self.votes['up'])} ({up_pct:.1f}%) • 👎 {len(self.votes['down'])} ({down_pct:.1f}%)\n`{progress_bar}`",
+            1,
+            name="📊 Résultats des Votes",
+            value=vote_display,
             inline=False,
         )
         await self.message.edit(embed=embed, view=self)
@@ -40,44 +81,92 @@ class VoteView(discord.ui.View):
     def has_permission(self, user: discord.Member):
         return any(role.id in self.ROLES_AUTORISES for role in user.roles)
 
-    @discord.ui.button(label="👍 Voter Pour", style=discord.ButtonStyle.blurple) # Traduit
+    @discord.ui.button(label="Pour", style=discord.ButtonStyle.success, emoji="👍")
     async def pour(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.votes["down"].discard(interaction.user.id)
         self.votes["up"].add(interaction.user.id)
-        await interaction.response.defer()
+        await interaction.response.send_message(
+            "✅ Votre vote **POUR** a été enregistré !",
+            ephemeral=True
+        )
         await self.update_message()
 
-    @discord.ui.button(label="👎 Voter Contre", style=discord.ButtonStyle.blurple) # Traduit
+    @discord.ui.button(label="Contre", style=discord.ButtonStyle.danger, emoji="👎")
     async def contre(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.votes["up"].discard(interaction.user.id)
         self.votes["down"].add(interaction.user.id)
-        await interaction.response.defer()
+        await interaction.response.send_message(
+            "✅ Votre vote **CONTRE** a été enregistré !",
+            ephemeral=True
+        )
         await self.update_message()
 
-    @discord.ui.button(label="✅ Approuver", style=discord.ButtonStyle.success) # Traduit
+    @discord.ui.button(label="Approuver", style=discord.ButtonStyle.success, emoji="✅", row=1)
     async def approuver(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.has_permission(interaction.user):
-            await interaction.response.send_message("❌ Vous n'avez pas la permission d'approuver.", ephemeral=True) # Traduit
+            await interaction.response.send_message(
+                "🚫 **Accès refusé** • Vous n'avez pas les permissions nécessaires.",
+                ephemeral=True
+            )
             return
 
         embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Statut", value="✅ Approuvée", inline=False) # Traduit
+        
+        # Changement visuel du statut
+        embed.color = COLORS["approved"]
+        embed.set_field_at(
+            0,
+            name="📌 Statut",
+            value="```diff\n+ APPROUVÉE\n```",
+            inline=True
+        )
+        
+        # Ajout de l'approbateur
+        embed.add_field(
+            name="👤 Approuvée par",
+            value=f"{interaction.user.mention}",
+            inline=True
+        )
+        
         await interaction.response.edit_message(embed=embed, view=None)
 
-        # Créer et envoyer dans le salon des approuvées
-        total = len(self.votes["up"]) + len(self.votes["down"])
-        up_pct = (len(self.votes["up"]) / total * 100) if total else 0
-        down_pct = (len(self.votes["down"]) / total * 100) if total else 0
+        # Embed pour le salon des validations
+        up_count = len(self.votes["up"])
+        down_count = len(self.votes["down"])
+        total = up_count + down_count
+        up_pct = (up_count / total * 100) if total else 0
+        down_pct = (down_count / total * 100) if total else 0
 
         validated_embed = discord.Embed(
-            title="✅ Suggestion Approuvée", # Traduit
-            description=embed.description,
-            color=discord.Color.green()
+            title="",
+            description=f"## ✨ Suggestion Approuvée\n\n{embed.description}",
+            color=COLORS["approved"]
         )
-        validated_embed.set_author(name=f"Proposée par : {self.author}") # Traduit
-        validated_embed.add_field(name="📊 Résultat", value=f"👍 {up_pct:.1f}% • 👎 {down_pct:.1f}%", inline=False) # Traduit
-        validated_embed.add_field(name="👤 Approuvée par", value=interaction.user.mention, inline=False) # Traduit
-        validated_embed.set_footer(text=f"{datetime.datetime.now():%d/%m/%Y à %H:%M}") # Format de date FR
+        
+        validated_embed.add_field(
+            name="👤 Proposée par",
+            value=f"{self.author.mention}\n`{self.author.name}`",
+            inline=True
+        )
+        
+        validated_embed.add_field(
+            name="✅ Validée par",
+            value=f"{interaction.user.mention}\n`{interaction.user.name}`",
+            inline=True
+        )
+        
+        validated_embed.add_field(
+            name="📊 Score Final",
+            value=f"```\n👍 {up_pct:.1f}%  •  👎 {down_pct:.1f}%\n({total} votes)```",
+            inline=False
+        )
+        
+        validated_embed.set_footer(
+            text=f"Approuvée le {datetime.datetime.now():%d/%m/%Y à %H:%M}",
+            icon_url=interaction.user.display_avatar.url
+        )
+        
+        validated_embed.set_thumbnail(url=self.author.display_avatar.url)
 
         if embed.image:
             validated_embed.set_image(url=embed.image.url)
@@ -86,40 +175,103 @@ class VoteView(discord.ui.View):
         if channel:
             await channel.send(embed=validated_embed)
 
-    @discord.ui.button(label="❌ Rejeter", style=discord.ButtonStyle.danger) # Traduit
+    @discord.ui.button(label="Rejeter", style=discord.ButtonStyle.danger, emoji="❌", row=1)
     async def rejeter(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.has_permission(interaction.user):
-            await interaction.response.send_message("❌ Vous n'avez pas la permission de rejeter.", ephemeral=True) # Traduit
+            await interaction.response.send_message(
+                "🚫 **Accès refusé** • Vous n'avez pas les permissions nécessaires.",
+                ephemeral=True
+            )
             return
+        
         embed = self.message.embeds[0]
-        embed.set_field_at(1, name="🕐 Statut", value="❌ Rejetée", inline=False) # Traduit
+        embed.color = COLORS["rejected"]
+        embed.set_field_at(
+            0,
+            name="📌 Statut",
+            value="```diff\n- REJETÉE\n```",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="👤 Rejetée par",
+            value=f"{interaction.user.mention}",
+            inline=True
+        )
+        
         await interaction.response.edit_message(embed=embed, view=None)
 
 class Suggestions(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="suggest", description="Soumettre une nouvelle suggestion.") # Traduit
+    @app_commands.command(name="suggest", description="✨ Soumettre une nouvelle suggestion")
+    @app_commands.describe(
+        texte="Décrivez votre suggestion en détail",
+        image="URL d'une image à joindre (optionnel)"
+    )
     async def suggest(self, interaction: discord.Interaction, texte: str, image: str = None):
-        embed = discord.Embed(title="💡 Suggestion", description=texte, color=discord.Color.orange())
-        embed.add_field(name="🕐 Statut", value="⏳ En attente", inline=False) # Traduit
-        embed.add_field(name="📊 Votes", value="👍 0 (0.0%) • 👎 0 (0.0%)\n`🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥`", inline=False)
-        embed.set_footer(text=f"Par {interaction.user} • {datetime.datetime.now():%d/%m/%Y à %H:%M}") # Format de date FR
+        # Embed principal avec design moderne
+        embed = discord.Embed(
+            title="",
+            description=f"## 💡 Nouvelle Suggestion\n\n{texte}",
+            color=COLORS["pending"]
+        )
+        
+        # Statut avec style
+        embed.add_field(
+            name="📌 Statut",
+            value="```yaml\nEn attente de votes```",
+            inline=True
+        )
+        
+        # Votes initiaux
+        embed.add_field(
+            name="📊 Résultats des Votes",
+            value=(
+                f"```\n"
+                f"┌─────────────────────────┐\n"
+                f"│  POUR     │   0  │  0.0% │\n"
+                f"│  CONTRE   │   0  │  0.0% │\n"
+                f"└─────────────────────────┘\n"
+                f"```\n"
+                f"🟢 ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 🔴\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"**0** vote au total"
+            ),
+            inline=False
+        )
+        
+        # Footer avec avatar
+        embed.set_footer(
+            text=f"Proposée par {interaction.user.name} • {datetime.datetime.now():%d/%m/%Y à %H:%M}",
+            icon_url=interaction.user.display_avatar.url
+        )
+        
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        
         if image:
             embed.set_image(url=image)
 
         view = VoteView(author=interaction.user)
 
-        # Envoi dans le salon des suggestions
-        channel = interaction.client.get_channel(CHANNEL_SUGGESTIONS_ID) # Utilisation de la constante
+        channel = interaction.client.get_channel(CHANNEL_SUGGESTIONS_ID)
         if channel is None:
-            await interaction.response.send_message("❌ Impossible de trouver le salon de suggestions.", ephemeral=True) # Traduit
+            await interaction.response.send_message(
+                "❌ **Erreur** • Le salon de suggestions est introuvable.",
+                ephemeral=True
+            )
             return
 
         msg = await channel.send(embed=embed, view=view)
         view.message = msg
 
-        await interaction.response.send_message("✅ Votre suggestion a été envoyée avec succès dans le salon dédié !", ephemeral=True) # Traduit
+        # Confirmation stylée
+        confirm_embed = discord.Embed(
+            description="✅ **Suggestion envoyée avec succès !**\n\nVotre suggestion a été publiée dans le salon dédié.",
+            color=COLORS["approved"]
+        )
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Suggestions(bot))
